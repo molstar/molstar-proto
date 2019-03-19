@@ -14,6 +14,7 @@ import { ParamDefinition as PD } from 'mol-util/param-definition';
 import { camelCaseToWords } from 'mol-util/string';
 import * as React from 'react';
 import LineGraphComponent from './line-graph/line-graph-component';
+import BarGraph from './bar-graph/bar-graph';
 import { Slider, Slider2 } from './slider';
 import { NumericInput, IconButton } from './common';
 
@@ -65,6 +66,7 @@ function controlFor(param: PD.Any): ParamControl | undefined {
         case 'line-graph': return LineGraphControl;
         case 'script-expression': return ScriptExpressionControl;
         case 'object-list': return ObjectListControl;
+        case 'histogram': return HistogramControl;
         default:
             const _: never = param;
             console.warn(`${_} has no associated UI component`);
@@ -115,6 +117,7 @@ export class LineGraphControl extends React.PureComponent<ParamProps<PD.LineGrap
 
     onHover = (point?: Vec2) => {
         this.setState({ isOverPoint: !this.state.isOverPoint });
+
         if (point) {
             this.setState({ message: `(${point[0].toFixed(2)}, ${point[1].toFixed(2)})` });
             return;
@@ -148,12 +151,82 @@ export class LineGraphControl extends React.PureComponent<ParamProps<PD.LineGrap
             </div>
             <div className='msp-control-offset' style={{ display: this.state.isExpanded ? 'block' : 'none' }}>
                 <LineGraphComponent
+                    height={400}
+                    width={600}
+                    padding={70}
                     data={this.props.param.defaultValue}
                     onChange={this.onChange}
                     onHover={this.onHover}
                     onDrag={this.onDrag} />
             </div>
         </>;
+    }
+}
+
+export class HistogramControl extends React.PureComponent<ParamProps<PD.Histogram>, {selected: string , isExpanded: boolean, message: any, userInput: number}> {
+    state = {
+        isExpanded: false,
+        selected: this.props.param.defaultValue.toPrecision(4),
+        message: this.props.param.defaultValue.toPrecision(4),
+        userInput: -Infinity
+    }
+
+    onClick = (value: number) => {
+        this.props.onChange({name: this.props.name, param: this.props.param, value});
+        this.setState({selected: value.toPrecision(4)})
+    }
+
+    onEnter = () => {
+        //TODO: Get user input and put it in its respecful bin 
+    }
+
+    update = (value: number) => {
+        this.props.onChange({ param: this.props.param, name: this.props.name, value});
+    }
+
+    onChange = (event: any) => {
+        const value = parseInt(event.target.value);
+        this.props.onChange({ param: this.props.param, name: this.props.name, value });
+        this.setState({message: value.toPrecision(4)});
+    }
+
+    toggleExpanded = (e:React.MouseEvent<HTMLElement>) => {
+        this.setState({ isExpanded: !this.state.isExpanded });
+        e.currentTarget.blur();
+    }
+
+    displaySelected = (value: number) => {
+        this.setState({message: this.state.selected});
+    }
+
+    onHover = (value: any) => {
+        this.setState({ message: value.toPrecision(4)});
+    }
+
+    render() {
+        const label = this.props.param.label || camelCaseToWords(this.props.name);
+        return (<>
+                    <div className='msp-control-row'>
+                        <span>{label}</span>
+                        <div className="msp-two-columns">   
+                            <div className={this.state.isExpanded ? "msp-down-arrow" : "msp-right-arrow"}
+                                onClick={this.toggleExpanded}></div>
+                            <NumericInput
+                                    value={Number(this.state.message)} onEnter={this.onEnter} placeholder={this.state.selected}
+                                    isDisabled={this.props.isDisabled} onChange={this.update} />
+                        </div>
+                    </div>
+                    <div className='msp-control-offset' style={{display: this.state.isExpanded ? 'block' : 'none'}}>
+                        <BarGraph 
+                            onHover={this.onHover} 
+                            onClick={this.onClick}
+                            height={400} 
+                            padding={70} 
+                            onMouseLeave={this.displaySelected}
+                            bins={this.props.param.histogram.bins} 
+                            counts={this.props.param.histogram.counts} />
+                    </div>
+                </>)
     }
 }
 
@@ -497,7 +570,6 @@ export class MappedControl extends React.PureComponent<ParamProps<PD.Mapped<any>
         const param = this.props.param.map(value.name);
         const label = this.props.param.label || camelCaseToWords(this.props.name);
         const Mapped = controlFor(param);
-
         const select = <SelectControl param={this.props.param.select}
             isDisabled={this.props.isDisabled} onChange={this.onChangeName} onEnter={this.props.onEnter}
             name={label} value={value.name} />
